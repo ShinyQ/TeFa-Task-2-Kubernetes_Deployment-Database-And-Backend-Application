@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tefa-be-article-app-config
+data:
+  APP_NAME: "tefa-be-article-app"
+  APP_PORT: "9000"
+  MYSQL_HOST: "tefa-mariadb-service"
+  MYSQL_PORT: "3306"
+  MYSQL_USER: "tefa_user"
+  MYSQL_PASSWORD: "password"
+  MYSQL_DATABASE: "tefa"
+  MYSQL_CONNECTION_LIMIT: "10"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tefa-be-article-app
+  labels:
+    app: tefa-be-article-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tefa-be-article-app
+  template:
+    metadata:
+      name: tefa-be-article-app
+      labels:
+        app: tefa-be-article-app
+    spec:
+      containers:
+        - name: tefa-be-article-app
+          image: shinyq11/tefa-deployment
+          ports:
+            - containerPort: 9000
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          envFrom:
+            - configMapRef:
+                name: tefa-be-article-app-config
+      
+---
+apiVersion: v1
+kind: Service 
+metadata:
+  name: tefa-be-article-app-service
+spec:
+  selector:
+    app: tefa-be-article-app
+  ports:
+  - port: 80
+    targetPort: 9000
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress 
+metadata: 
+  name: tefa-be-article-app-ingress
+  labels:
+    app: tefa-be-article-app-ingress
+spec:
+  rules:
+  - host: tefa-be-article-app.kurniadi.local
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: tefa-be-article-app-service
+            port:
+              number: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tefa-be-article-app-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tefa-be-article-app
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
